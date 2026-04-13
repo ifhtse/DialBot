@@ -72,3 +72,14 @@ def kb_cancel_fsm() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="❌ Отмена", callback_data="menu_accounts")]
         ]
     )
+
+# === Сценарии ===
+def kb_scenario_main() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="✏️ Загрузить сценарий", callback_data="add_scenario")],
+            [InlineKeyboardButton(text="👀 Показать текущий сценарий", callback_data="show_scenario")],
+            [InlineKeyboardButton(text="🖼 Загрузить фото", callback_data="add_photo")],
+            [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_main")]
+        ]
+    )

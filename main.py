@@ -7,7 +7,7 @@ from app.core.logger import logger
 from app.database.connection import init_db
 
 from app.tg_admin.middlewares import AdminMiddleware
-from app.tg_admin.handlers import base, settings, accounts
+from app.tg_admin.handlers import base, settings, accounts, scenario
 
 async def main():
     logger.info("Запуск бота")
@@ -23,6 +23,8 @@ async def main():
     dp.include_router(base.router)
     dp.include_router(settings.router)
     dp.include_router(accounts.router)
+    dp.include_router(scenario.router)
+
     try:
         logger.info("Бот успешно запущен и слушает")
         await dp.start_polling(bot)

@@ -15,56 +15,48 @@ router = Router(name="accounts_router")
 
 pending_logins = {}
 
+
 @router.callback_query(F.data == "menu_accounts")
-async def cb_menu_accounts(call: CallbackQuery,state: FSMContext):
+async def cb_menu_accounts(call: CallbackQuery, state: FSMContext):
     await state.clear()
-    await call.message.edit_text("👤 Управление аккаунтами (юзерботами):", reply_markup=kb_accounts_main())
+    await call.message.edit_text("👤 Управление аккаунтами:", reply_markup=kb_accounts_main())
     await call.answer()
 
-@router.callback_query(F.data == "add_accounts")
-async def cb_add_accounts(call: CallbackQuery,state: FSMContext):
+
+@router.callback_query(F.data == "add_account")
+async def cb_add_account(call: CallbackQuery, state: FSMContext):
+    logger.info(f"Админ {call.from_user.id} нажал 'Добавить аккаунт'")
+    await call.answer()  # Сразу гасим часики
+
     await state.set_state(AdminState.ACCOUNT_PHONE)
     await call.message.edit_text(
-        "📱 Введи номер телефона для нового аккаунта.\n"
-        "Формат: +79991234567\n\n"
-        "*(Имя сессии сгенерируется автоматически)*",
-        reply_markup=kb_cancel_fsm(),
-        parse_mode="Markdown"
+        "📱 Введи номер телефона для нового аккаунта (с +):",
+        reply_markup=kb_cancel_fsm()
     )
-    await call.answer()
+
 
 @router.message(AdminState.ACCOUNT_PHONE)
 async def process_account_phone(msg: Message, state: FSMContext):
     phone = msg.text.strip()
-    if not phone.startswith("+"):
-        await msg.answer("Номер должен начинаться с '+'. Попробуй еще раз: ", reply_markup=kb_cancel_fsm())
-        return
+    session_name = f"acc_{phone.replace('+', '')}"
 
-
-    session_name = f"acc_{phone.replace('+', '').replace(' ','')}"
-    session_path = client_pool.get_session_path(session_name)
-
-    client = TelegramClient(session_path, config.api_id, config.api_hash)
-    await client.connect()
+    # Создаем клиента
+    client = TelegramClient(client_pool.get_session_path(session_name), config.api_id, config.api_hash)
 
     try:
+        await client.connect()
         sent = await client.send_code_request(phone)
 
         pending_logins[msg.from_user.id] = {
-            "client": client,
-            "phone": phone,
-            "phone_code_hash": sent.phone_code_hash,
-            "session_name": session_name,
+            "client": client, "phone": phone,
+            "phone_code_hash": sent.phone_code_hash, "session_name": session_name
         }
 
         await state.set_state(AdminState.ACCOUNT_CODE)
-        await msg.answer("✅ Код отправлен в Telegram!\n\n"
-            "✉️ Введи полученный код (только цифры):",
-            reply_markup=kb_cancel_fsm()
-        )
+        await msg.answer("✉️ Введи код из Telegram:")
     except Exception as e:
-        logger.error(f"Ошибка при отправке кода на {phone}: {e}")
-        await msg.answer(f"❌ Ошибка отправки кода: {e}", reply_markup=kb_accounts_main())
+        logger.error(f"Ошибка при подключении аккаунта {phone}: {e}")
+        await msg.answer(f"❌ Ошибка: {e}")
         await state.clear()
 
 @router.message(AdminState.ACCOUNT_CODE)

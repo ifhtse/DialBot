@@ -77,3 +77,31 @@ class DBRepository:
                 rows = await cursor.fetchall()
                 return [{"session_name": row["session_name"], "phone": row["phone"], "status": row["status"]} for row in
                         rows]
+
+
+
+    #scenario
+    @staticmethod
+    async def clear_scenario():
+        """Очищает текущий сценарий."""
+        async with get_db() as db:
+            await db.execute("DELETE FROM scenario")
+            await db.commit()
+
+    @staticmethod
+    async def add_scenario_step(sender_tag: str, step_type: str, content: str, media_path: Optional[str] = None):
+        """Добавляет один шаг в сценарий."""
+        async with get_db() as db:
+            await db.execute(
+                "INSERT INTO scenario (sender_tag, step_type, content, media_path) VALUES (?, ?, ?, ?)",
+                (sender_tag, step_type, content, media_path)
+            )
+            await db.commit()
+
+    @staticmethod
+    async def get_scenario() -> list[dict]:
+        """Возвращает весь сценарий по порядку."""
+        async with get_db() as db:
+            async with db.execute("SELECT id, sender_tag, step_type, content, media_path FROM scenario ORDER BY id") as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
