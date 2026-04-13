@@ -1,36 +1,43 @@
 import aiosqlite
+from contextlib import asynccontextmanager
 from app.core.config import config
 from app.core.logger import logger
 
-async def get_db() -> aiosqlite.Connection:
-    db = await aiosqlite.connect(config.db_path)
-    db.row_factory = aiosqlite.Row
-    return db
+
+@asynccontextmanager
+async def get_db():
+    """Возвращает асинхронное подключение к БД (как контекстный менеджер)."""
+    async with aiosqlite.connect(config.db_path) as db:
+        db.row_factory = aiosqlite.Row
+        yield db
+
 
 async def init_db():
-    logger.info("Инициализация ДБ")
+    """Создает таблицы, если их нет, и добавляет супер-админа."""
+    logger.info("Инициализация базы данных...")
 
-    async with await get_db() as db:
+    # ВАЖНО: Тут мы пишем просто async with get_db() as db:
+    # Никаких await ПЕРЕД get_db() быть не должно!
+    async with get_db() as db:
         await db.execute("""
-            CREATE TABLE IF NOT EXISTS admins
-            (
-                user_id    INTEGER PRIMARY KEY,
-                added_by   INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            )
-            """)
-        # Таблица аккаунтов
-        await db.execute("""
-        CREATE TABLE IF NOT EXISTS accounts
-        (
-            session_name TEXT PRIMARY KEY,
-            phone        TEXT,
-            status       TEXT      DEFAULT 'active',
-            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )"""
+                         CREATE TABLE IF NOT EXISTS admins
+                         (
+                             user_id    INTEGER PRIMARY KEY,
+                             added_by   INTEGER,
+                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                          )
+                         """)
 
-        # Таблица целевых чатов
+        await db.execute("""
+                         CREATE TABLE IF NOT EXISTS accounts
+                         (
+                             session_name TEXT PRIMARY KEY,
+                             phone        TEXT,
+                             status       TEXT      DEFAULT 'active',
+                             created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                         )
+                         """)
+
         await db.execute("""
                          CREATE TABLE IF NOT EXISTS chats
                          (
@@ -39,19 +46,17 @@ async def init_db():
                          )
                          """)
 
-        # Таблица сценария
         await db.execute("""
                          CREATE TABLE IF NOT EXISTS scenario
                          (
                              id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                             sender_tag TEXT, -- например "account_1" или "account_2"
-                             step_type  TEXT, -- "text" или "photo"
+                             sender_tag TEXT,
+                             step_type  TEXT,
                              content    TEXT,
-                             media_path TEXT  -- путь к картинке, если step_type == "photo"
+                             media_path TEXT
                          )
                          """)
 
-        # Глобальные настройки (задержки и т.д.)
         await db.execute("""
                          CREATE TABLE IF NOT EXISTS settings
                          (
@@ -60,7 +65,6 @@ async def init_db():
                          )
                          """)
 
-        # Статистика
         await db.execute("""
                          CREATE TABLE IF NOT EXISTS global_stats
                          (
@@ -79,4 +83,4 @@ async def init_db():
         )
 
         await db.commit()
-    logger.info("BD is all set")
+    logger.info("База данных готова.")
